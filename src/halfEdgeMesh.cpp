@@ -1,3 +1,4 @@
+
 #include "halfEdgeMesh.h"
 #include <sstream>
 
