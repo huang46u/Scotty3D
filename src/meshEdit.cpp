@@ -15,21 +15,25 @@ VertexIter HalfedgeMesh::splitEdge(EdgeIter e0) {
   // HALFEDGES
     if (e0->isBoundary()) return e0->halfedge()->vertex();
     if (e0->halfedge()->face()->degree() != 3 || e0->halfedge()->twin()->face()->degree() != 3) return e0->halfedge()->vertex();
-    HalfedgeIter h = e0->halfedge(), t = h->twin();
+    HalfedgeIter h = e0->halfedge(), t = h->twin(), r1 = h->next(), r2 = r1->next(),r3= t->next(), r4 = r3->next();
     FaceIter f0 = h->face(), f1 = t->face();
-    VertexIter v0 = h->vertex(), v1 = t->vertex(), v2 = h->next()->next()->vertex(),v3 = t->next()->next()->vertex();
+    VertexIter v0 = h->vertex(), v1 = t->vertex(), v2 = r2->vertex(),v3 = r4->vertex();
     VertexIter v = newVertex();
     EdgeIter e1 = newEdge(), e2 = newEdge(),e3 = newEdge();
+    v->isNew = true;
+    e1->isNew = true;
+    e2->isNew = true;
+    e3->isNew = true;
     FaceIter f2 = newFace(), f3 = newFace();
     v->position = e0->centroid();
     HalfedgeIter h1 = newHalfedge(), t1 = newHalfedge(),h2 = newHalfedge(), t2 = newHalfedge(),h3 = newHalfedge(), t3 = newHalfedge();
-    h1->setNeighbors(h->next()->next(), t1, v, e1, f0);
+    h1->setNeighbors(r2, t1, v, e1, f0);
     t1->setNeighbors(h2, h1, v2, e1, f2);
-    h2->setNeighbors(h->next(), t2, v, e2, f2);
+    h2->setNeighbors(r1, t2, v, e2, f2);
     t2->setNeighbors(h3, h2, v1, e2, f3);
-    h3->setNeighbors(t->next()->next(), t3, v, e3, f3);
+    h3->setNeighbors(r4, t3, v, e3, f3);
     t3->setNeighbors(t, h3, v3, e3, f1);
-    v->halfedge() = h2;
+    v->halfedge() = t;
     e1->halfedge() = h1;
     e2->halfedge() = h2;
     e3->halfedge() = h3;
@@ -37,12 +41,13 @@ VertexIter HalfedgeMesh::splitEdge(EdgeIter e0) {
     f1->halfedge() = t;
     f2->halfedge() = t1;
     f3->halfedge() = h3;
-    h2->next()->next() = t1;
-    h3->next()->next() = t2;
-    t->next()->next() = t3;
-
+    r1->next() = t1;
+    r1->face() = f2;
+    r4->next() = t2;
+    r4->face() = f3;
+    r3->next() = t3;
     h->next() = h1;
-
+   
     t->vertex() = v;
     return v;
 }
@@ -176,23 +181,27 @@ VertexIter HalfedgeMesh::collapseEdge(EdgeIter e) {
     bool b1 = f1->degree() == 3, b2 = f2->degree() == 3;
     v1->position = e->centroid();
     v1->halfedge() = h1->next()->twin()->next();
-    v2->halfedge() = h2->next()->twin()->next();
-
     //update left side face
     if (b1) {
         HalfedgeIter r1 = h1->next(), r2 = r1->twin(), r3 = r1->next(), r4 = r3->twin();
-        
+        HalfedgeIter r5 = r2->next();
+        while (r5->next() != r2) {
+            r5 = r5->next();
+        }
+
         EdgeIter e1 = r1->edge(), e2 = r3->edge();
         FaceIter f3 = r2->face();
+
         r3->next() = r2->next();
+        r5->next() = r3;
         r3->face() = f3;
         h1 = r2->next();
 
         f3->halfedge() = r3;
-
         deleteHalfedge(r1);
         deleteHalfedge(r2);
         deleteEdge(e1);
+        deleteFace(f1);
     }
     else {
         HalfedgeIter r1 = h1->next(), r2 = h1;
@@ -211,22 +220,27 @@ VertexIter HalfedgeMesh::collapseEdge(EdgeIter e) {
         h1->vertex() = v1;
         h1 = h1->twin()->next();
     }
-    h1->vertex() = v1;
-    h1 = h1->twin();
-
     //update right part
     if (b2) {
-        HalfedgeIter r1 = h2->next(), r2 = r1->twin(), r3 = r2->next() ;
-        EdgeIter e1 = r1->edge();
-        h1->next() = r3;
-        h1->face() = r3->face();
-        
-        r3->face()->halfedge() = h1;
-        deleteHalfedge(r1);
-        deleteHalfedge(r2);
+        HalfedgeIter r1 = h2->next(), r2 = r1->twin(), r3 = h1, r4 = r3->twin();
+        HalfedgeIter r5 = r3->next();
+        FaceIter f4 = r5->face();
+        while (r5->next() != r3) {
+            r5 = r5->next();
+        }
+        EdgeIter e1 = r3->edge();
+        r1->next() = r3->next();
+        r5->next() = r1;
+        r1->face() = f4;
+        f4->halfedge() = r1;
+        deleteHalfedge(r3);
+        deleteHalfedge(r4);
         deleteEdge(e1);
+        deleteFace(f2);
     }
     else {
+        h1->vertex() = v1;
+        h1 = h1->twin();
         h1->next() = h2->next();
         h1->face()->halfedge() = h2->next();
     }
@@ -236,8 +250,7 @@ VertexIter HalfedgeMesh::collapseEdge(EdgeIter e) {
     deleteHalfedge(h2);
     deleteEdge(e);
     deleteVertex(v2);
-    if (b1) deleteFace(f1);
-    if (b2) deleteFace(f2);
+
     return v1;
     
 }
@@ -298,30 +311,27 @@ FaceIter HalfedgeMesh::eraseEdge(EdgeIter e) {
   // TODO: (meshEdit)
   // This method should erase the given edge and return an iterator to the
   // merged face.
-    vector<HalfedgeIter> hf1;
-    vector<HalfedgeIter> hf2;
-    HalfedgeIter h0 = e->halfedge(), tmp = h0;
-    FaceIter f1 = h0->face();
-    do {
-        hf1.push_back(tmp);
+    HalfedgeIter h0 = e->halfedge(), h1 = h0->twin(), h0_prev = h0->next(), h1_prev = h1->next(), h2 = h0->next(), h3 = h1->next();
+    VertexIter v0 = h0->vertex(), v1 = h1->vertex();
+    while (h0_prev->next() != h0) 
+        h0_prev = h0_prev->next();
+    while (h1_prev->next() != h1) 
+        h1_prev = h1_prev->next();
+    FaceIter f1 = h0->face(), f2 = h1->face();
+    h1_prev->next() = h2;
+    h0_prev->next() = h3;
+    HalfedgeIter tmp = h3;
+    while (tmp->next() != h3) {
+        tmp->face() = f1;
         tmp = tmp->next();
-    } while (tmp != h0);
-    HalfedgeIter h1 = h0->twin();
-    tmp = h1;
-    FaceIter f2 = h1->face();
-
-    do {
-        hf2.push_back(tmp);
-        tmp = tmp->next();
-    } while (tmp != h1);
-    size_t s1 = hf1.size() - 1, s2 = hf2.size() - 1;
-    hf1[s1]->next() = hf2[1];
-    hf2[s2]->next() = hf1[1];
-
-    for (HalfedgeIter& h : hf2)  h->face() = f1;
+    }
+    v0->halfedge() = h3;
+    v1->halfedge() = h2;
+    f1->halfedge() = h2;
+    //tmp->face() = f1;
     deleteFace(f2);
-    deleteHalfedge(hf1[0]);
-    deleteHalfedge(hf2[0]);
+    deleteHalfedge(h0);
+    deleteHalfedge(h1);
     deleteEdge(e);
     return f1;
 }
@@ -331,6 +341,7 @@ EdgeIter HalfedgeMesh::flipEdge(EdgeIter e0) {
   // This method should flip the given edge and return an iterator to the
   // flipped edge.
     if (e0->isBoundary()) return e0;
+
 
     HalfedgeIter h0 = e0->halfedge();
     HalfedgeIter h1 = h0->next();
@@ -346,7 +357,7 @@ EdgeIter HalfedgeMesh::flipEdge(EdgeIter e0) {
     // VERTICES
     VertexIter v0 = h0->vertex();
     VertexIter v1 = h3->vertex();
-    VertexIter v2 = h8->vertex();
+    VertexIter v2 = h5->vertex();
     VertexIter v3 = h2->vertex();
     // ...you fill in the rest!...
 
@@ -362,89 +373,100 @@ EdgeIter HalfedgeMesh::flipEdge(EdgeIter e0) {
     FaceIter f0 = h0->face();
     FaceIter f1 = h3->face();
 
-    h0->next() = h1;
-    h0->twin() = h3;
+    h0->next() = h2;
     h0->vertex() = v2;
-    h0->edge() = e0;
-    h0->face() = f0;
-
-    h1->next() = h2;
-    h1->twin() = h7;
-    h1->vertex() = v3;
-    h1->edge() = e3;
-    h1->face() = f0;
-
-    h2->next() = h0;
-    h2->twin() = h8;
-    h2->vertex() = v0;
-    h2->edge() = e2;
-    h2->face() = f0;
-
-    h3->next() = h4;
-    h3->twin() = h0;
+    h3->next() = h5;
     h3->vertex() = v3;
-    h3->edge() = e0;
-    h3->face() = f1;
+    h2->next() = h4;
+    h4->next() = h0;
+    h1->next() = h3;
+    h1->face() = f1;
+    h4->face() = f0;
+    h5->next() = h1;
+    v0->halfedge() = h4;
+    v1->halfedge() = h1;
+    v2->halfedge() = h5;
+    v3->halfedge() = h2;
 
-    h4->next() = h5;
-    h4->twin() = h9;
-    h4->vertex() = v2;
-    h4->edge() = e1;
-    h4->face() = f1;
-
-    h5->next() = h3;
-    h5->twin() = h6;
-    h5->vertex() = v1;
-    h5->edge() = e4;
-    h5->face() = f1;
-
-    h6->next() = h6->next();
-    h6->twin() = h5;
-    h6->vertex() = v3;
-    h6->edge() = e4;
-    h6->face() = h6->face();
-
-    h7->next() = h7->next();
-    h7->twin() = h1;
-    h7->vertex() = v0;
-    h7->edge() = e3;
-    h7->face() = h7->face();
-
-    h8->next() = h8->next();
-    h8->twin() = h2;
-    h8->vertex() = v2;
-    h8->edge() = e2;
-    h8->face() = h8->face();
-
-    h9->next() = h9->next();
-    h9->twin() = h4;
-    h9->vertex() = v1;
-    h9->edge() = e1;
-    h9->face() = h9->face();
-
-
-    // VERTICES
-    v0->halfedge() = h2;
-    v1->halfedge() = h5;
-    v2->halfedge() = h4;
-    v3->halfedge() = h1;
-    // ...you fill in the rest!...
-
-    // EDGES
-    e0->halfedge() = h0;
-    e1->halfedge() = h4;
-    e2->halfedge() = h2;
-    e3->halfedge() = h1;
-    e4->halfedge() = h5;
-
-
-    // ...you fill in the rest!...
-
-    // FACES
-    f0->halfedge() = h0;
     f1->halfedge() = h3;
-    
+    f0->halfedge() = h1;
+            
     return e0;
+    /*if (e0->isBoundary()) {
+        return e0;
+    }
+
+    HalfedgeIter h0 = e0->halfedge();
+    HalfedgeIter h1 = h0->next();
+    HalfedgeIter h2 = h1->next();
+    HalfedgeIter h3 = h0->twin();
+    HalfedgeIter h4 = h3->next();
+    HalfedgeIter h5 = h4->next();
+    HalfedgeIter h6 = h1->twin();
+    //HalfedgeIter h7 = h2->twin();
+    HalfedgeIter h8 = h4->twin();
+    //HalfedgeIter h9 = h5->twin();
+    HalfedgeIter h10 = h3;
+    while (h10->next() != h3) {
+        h10 = h10->next();
+    }
+    HalfedgeIter h11 = h0;
+    while (h11->next() != h0) {
+        h11 = h11->next();
+    }
+
+    VertexIter v0 = h0->vertex();
+    VertexIter v1 = h3->vertex();
+    VertexIter v2 = h6->vertex();
+    VertexIter v3 = h8->vertex();
+
+
+
+    FaceIter f0 = h0->face();
+    FaceIter f1 = h3->face();
+
+
+    v0->halfedge() = h4;
+    v1->halfedge() = h1;
+    v2->halfedge() = h2;
+    v3->halfedge() = h5;
+    f0->halfedge() = h2;
+    f1->halfedge() = h5;
+
+    h0->next() = h2;
+    h0->twin() = h3;
+    h0->vertex() = v3;
+    h0->face() = f0;
+    h1->next() = h3;
+    //h1->twin() = h6;
+    //h1->vertex() = v1;
+    h1->face() = f1;
+    if (h2->next() == h0) {
+        h2->next() = h4;
+    }
+    //h2->twin() = h7;
+    //h2->vertex() = v2;
+    //h2->face() = f0;
+    h3->next() = h5;
+    h3->twin() = h0;
+    h3->vertex() = v2;
+    h3->face() = f1;
+    h4->next() = h0;
+    //h4->twin() = h8;
+    //h4->vertex() = v0;
+    h4->face() = f0;
+    h10->next() = h1;
+    //h10->twin()
+    //h10->vertex()
+    //h10->face()
+    h11->next() = h4;
+
+    // TODO: (meshEdit)
+    // This method should flip the given edge and return an iterator to the
+    // flipped edge.
+
+
+    return e0;*/
 }
 
 void HalfedgeMesh::subdivideQuad(bool useCatmullClark) {
@@ -937,12 +959,28 @@ void MeshResampler::upsample(HalfedgeMesh& mesh)
   // the new subdivided (fine) mesh, which has more elements to traverse.  We
   // will then assign vertex positions in
   // the new mesh based on the values we computed for the original mesh.
-
   // Compute updated positions for all the vertices in the original mesh, using
   // the Loop subdivision rule.
 
-  // Next, compute the updated vertex positions associated with edges.
+    for (VertexIter v = mesh.verticesBegin(); v != mesh.verticesEnd(); v++) {
+        v->isNew = false;
+        v->halfedge()->edge()->isNew = false;
+        HalfedgeIter h = v->halfedge();
+        int n = v->degree();
+        double u = n==3? 3/16 :3 / (8 * n);
 
+        v->newPosition = (1. - n * u) * v->position + (u * n) * v->neighborhoodCentroid();
+    }
+
+  
+  // Next, compute the updated vertex positions associated with edges.
+    for(EdgeIter e = mesh.edgesBegin(); e!= mesh.edgesEnd(); e++){
+        e->isNew = false;
+        HalfedgeIter h = e->halfedge(), t = h->twin();
+        if (h->face()->degree() != 3) continue;
+        VertexIter v1 = h->vertex(), v2 = t->vertex(), v3 = h->next()->next()->vertex(), v4 = t->next()->next()->vertex();
+        e->newPosition = (3./8.) * (v1->position + v2->position)  + (1./8.)*(v3->position + v4->position);
+    }
   // Next, we're going to split every edge in the mesh, in any order.  For
   // future
   // reference, we're also going to store some information about which
@@ -953,11 +991,59 @@ void MeshResampler::upsample(HalfedgeMesh& mesh)
   // mesh---otherwise,
   // we'll end up splitting edges that we just split (and the loop will never
   // end!)
+    int n = mesh.nEdges();
+    EdgeIter e = mesh.edgesBegin();
+    for (int i = 0; i < n; i++) {
 
+        // get the next edge NOW!
+        EdgeIter nextEdge = e;
+        nextEdge++;
+
+        // now, even if splitting the edge deletes it...
+        if(!e->isNew){
+            VertexIter v_temp = mesh.splitEdge(e);
+            v_temp->newPosition = e->newPosition;
+            v_temp->isNew = true;
+            HalfedgeIter he_temp = v_temp->halfedge()->twin()->next();
+            while (he_temp != v_temp->halfedge()) {
+                he_temp->edge()->isNew = true;
+                he_temp = he_temp->twin()->next();
+            }
+
+            v_temp->halfedge()->edge()->isNew = false;
+            v_temp->halfedge()->twin()->next()->twin()->next()->edge()->isNew = false;
+        }
+
+        // ...we still have a valid reference to the next edge.
+        e = nextEdge;
+    }
   // Finally, flip any new edge that connects an old and new vertex.
+    /*n = mesh.nEdges();
+    e = mesh.edgesBegin();
+    for (int i = 0; i < n; i++) {
+        HalfedgeIter h = e->halfedge();
+        // get the next edge NOW!
+        EdgeIter nextEdge = e;
+        nextEdge++;
 
-  // Copy the updated vertex positions to the subdivided mesh.
-  showError("upsample() not implemented.");
+        // now, even if splitting the edge deletes it...
+        if (e->isNew) {
+            if ((h->vertex()->isNew && !h->twin()->vertex()->isNew) ||
+                (!h->vertex()->isNew && h->twin()->vertex()->isNew)){
+                mesh.flipEdge(e);
+            }
+        }
+
+        // ...we still have a valid reference to the next edge.
+        e = nextEdge;
+    }
+        
+     for (VertexIter v = mesh.verticesBegin(); v != mesh.verticesEnd(); v++) {
+       if (!v->isNew) v->position = v->newPosition;
+     }*/
+
+      // Copy the updated vertex positions to the subdivided mesh.
+    
 }
 
 void MeshResampler::downsample(HalfedgeMesh& mesh) {
