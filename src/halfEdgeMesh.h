@@ -152,7 +152,6 @@
 #include "collada/polymesh_info.h"
 
 typedef std::vector<std::string> Info;
-
 using namespace std;
 using namespace CMU462;
 
