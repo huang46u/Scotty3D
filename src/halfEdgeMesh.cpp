@@ -899,7 +899,6 @@ void HalfedgeMesh::checkConsistency() const {
 	for (HalfedgeCIter h = halfedgesBegin(); h != halfedgesEnd(); h++) {
 		if (halfedgeCounter.find(h->next()) == halfedgeCounter.end()) {
 			halfedgeCounter[h->next()] = true;
-
 		} else {
 			cerr << "halfedge is pointed to by more than one halfedge's next!" << endl;
 			exit(1);

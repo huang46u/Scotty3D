@@ -58,86 +58,96 @@ VertexIter HalfedgeMesh::collapseEdge(EdgeIter e) {
   // the new vertex created by the collapse.
     
     if (e->isBoundary()) { return e->halfedge()->vertex(); }
-    HalfedgeIter h1 = e->halfedge(), h2 = h1->twin(), oh = e->halfedge();
+    
+    HalfedgeIter h1 = e->halfedge(), h2 = h1->twin(), tmp = h1;
     VertexIter v1 = h1->vertex(), v2 = h2->vertex();
     FaceIter f1 = h1->face(), f2 = h2->face() ;
     bool b1 = f1->degree() == 3, b2 = f2->degree() == 3;
     
-    v1->halfedge() = h1->next()->twin()->next();
+    HalfedgeIter h = h1->next()->twin()->next();
     //update left side face
     if (b1) {
         
-        HalfedgeIter r1 = h1->next(), r2 = r1->twin(), r3 = r1->next(), r4 = r3->twin();
-        
+        HalfedgeIter r1 = tmp->next(), r2 = r1->twin(), r3 = r1->next(), r4 = r3->twin();
+       
         HalfedgeIter r5 = r2->next();
         while (r5->next() != r2) {
             r5 = r5->next();
         }
-
+        
+        
         EdgeIter e1 = r1->edge(), e2 = r3->edge();
         FaceIter f3 = r2->face();
-
+       
         r3->next() = r2->next();
         r5->next() = r3;
         r3->face() = f3;
-        h1 = r3->next();
-
+        tmp = r3->next();
+        
         f3->halfedge() = r3;
+        
         deleteHalfedge(r1);
         deleteHalfedge(r2);
         deleteEdge(e1);
-        deleteFace(f1);
+        
+        
+
     }
     else {
-        HalfedgeIter r1 = h1->next(), r2 = h1;
-        while (r2->next() != h1) {
+        HalfedgeIter r1 = tmp->next(), r2 = tmp;
+        while (r2->next() != tmp) {
             r2 = r2->next();
         }
         r1->vertex() = v1;
         r2->next() = r1;
         r1->face()->halfedge() = r1;
         
-        h1 = r1->twin()->next();
+        tmp = r1->twin()->next();
     }
-
+    
+    
     //update upper part
-    while (h1 ->twin()-> next()!= h2) {
-        h1->vertex() = v1;
-        h1 = h1->twin()->next();
+    while (tmp ->twin()-> next()!= h2) {
+        tmp->vertex() = v1;
+        tmp = tmp->twin()->next();
     }
     //update right part
     if (b2) {
-        HalfedgeIter r1 = h2->next(), r2 = r1->twin(), r3 = h1, r4 = r3->twin();
+        HalfedgeIter r1 = h2->next(), r2 = r1->twin(), r3 = tmp, r4 = r3->twin();
         HalfedgeIter r5 = r3->next();
         FaceIter f4 = r5->face();
         while (r5->next() != r3) {
             r5 = r5->next();
         }
+        if (r5->next() == r3) cout << "sdsdsfsdfsdfs" << endl;
         EdgeIter e2 = r3->edge();
         r1->next() = r3->next();
         r5->next() = r1;
         r1->face() = f4;
         f4->halfedge() = r1;
-        h1 = r2;
+        checkConsistency();
         deleteHalfedge(r3);
         deleteHalfedge(r4);
         deleteEdge(e2);
-        deleteFace(f2);
+        
     }
     else {
-        h1->vertex() = v1;
-        h1 = h1->twin();
-        h1->next() = h2->next();
-        h1->face()->halfedge() = h2->next();
+        tmp->vertex() = v1;
+        tmp = tmp->twin();
+        tmp->next() = h2->next();
+        tmp->face()->halfedge() = h2->next();
     }
+    v1->halfedge() = h;
     v1->position = e->centroid();
+    if(b1) deleteFace(f1);
+    if(b2) deleteFace(f2);
     
     //delete 
-    deleteHalfedge(oh);
+    deleteHalfedge(h1);
     deleteHalfedge(h2);
     deleteEdge(e);
     deleteVertex(v2);
-
+    checkConsistency();
     return v1;
     
 }
